@@ -1,0 +1,55 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Pretendard',
+    'Noto Sans KR', 'Malgun Gothic', system-ui, sans-serif;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: #f1f5f9;
+  color: #0f172a;
+  font-family: var(--font-sans);
+  font-size: 17px;
+  line-height: 1.6;
+  overscroll-behavior-y: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* 터치 반응 지연(300ms) 제거 + 버튼 텍스트 드래그 방지 */
+button,
+a,
+label {
+  touch-action: manipulation;
+}
+button {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* iOS에서 입력 포커스 시 자동 확대되지 않도록 16px 이상 유지 */
+input,
+textarea,
+select {
+  font-size: 17px;
+  font-family: inherit;
+}
+
+textarea {
+  line-height: 1.6;
+}
+
+/* 스크롤바 (데스크톱에서만 보임) */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}

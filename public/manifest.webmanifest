@@ -1,0 +1,10 @@
+{
+  "name": "경찰 오답노트",
+  "short_name": "오답노트",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f1f5f9",
+  "theme_color": "#1e293b"
+}
