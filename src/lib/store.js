@@ -2,9 +2,26 @@ import { uid } from './util.js'
 
 export const STORAGE_KEY = 'ox-wrongnote-v1'
 export const SESSION_KEY = 'ox-wrongnote-session-v1'
-export const SCHEMA_VERSION = 1
+export const SCHEMA_VERSION = 2
 
+/**
+ * 시험(노트)별로 문제·과목·풀이기록이 완전히 분리된다.
+ * 최상위 상태는 시험 목록만 들고 있고, 화면은 항상 활성 시험 하나만 본다.
+ */
+
+/**
+ * v1(단일 노트) 데이터를 옮겨 담을 때 쓰는 고정 id.
+ * 기기마다 랜덤 id로 옮기면 동기화할 때 같은 노트가 둘로 갈라지므로 반드시 고정값이어야 한다.
+ */
+export const DEFAULT_EXAM_ID = 'exam_default'
+export const DEFAULT_EXAM_NAME = '경찰공무원 필기시험'
+export const DEFAULT_EXAM_DATE = '2026-09-05'
 export const DEFAULT_SUBJECTS = ['정보보호론', '시스템네트워크보안', '디지털포렌식']
+
+/** 새로 만든 시험의 기본 과목 */
+export const NEW_EXAM_SUBJECTS = ['미분류']
+
+const EPOCH = new Date(0).toISOString()
 
 /**
  * 학습 로그 보관 정책 (localStorage 용량 방어).
@@ -17,14 +34,44 @@ const LOG_MAX_DAYS = 200
 /** 삭제 기록 보관 기간 — 이보다 오래된 tombstone은 정리 */
 const TOMBSTONE_DAYS = 90
 
+/* ---------- 시험(노트) ---------- */
+
+export function makeExam(patch = {}) {
+  const now = new Date().toISOString()
+  return normalizeExam({
+    id: patch.id || uid('exam'),
+    name: patch.name || '새 시험',
+    examDate: patch.examDate || '',
+    metaUpdatedAt: now,
+    createdAt: now,
+    subjects: patch.subjects?.length ? patch.subjects : NEW_EXAM_SUBJECTS,
+    subjectsUpdatedAt: now,
+  })
+}
+
+/**
+ * 최초 실행 / v1 마이그레이션에 쓰이는 기본 노트.
+ * 시각을 epoch로 두어, 다른 기기에서 이름·시험일을 이미 바꿨다면 그쪽이 항상 이긴다.
+ */
+export function defaultExam() {
+  return normalizeExam({
+    id: DEFAULT_EXAM_ID,
+    name: DEFAULT_EXAM_NAME,
+    examDate: DEFAULT_EXAM_DATE,
+    metaUpdatedAt: EPOCH,
+    createdAt: EPOCH,
+    subjects: DEFAULT_SUBJECTS,
+    subjectsUpdatedAt: EPOCH,
+  })
+}
+
 export function emptyState() {
+  const exam = defaultExam()
   return {
     version: SCHEMA_VERSION,
-    subjects: [...DEFAULT_SUBJECTS],
-    subjectsUpdatedAt: new Date(0).toISOString(),
-    problems: [],
-    logs: [], // { t: epochMs, id, ok }
-    deleted: {}, // { [problemId]: 삭제시각ISO } — 동기화 시 삭제가 되살아나지 않도록
+    activeExamId: exam.id,
+    exams: [exam],
+    deletedExams: {}, // { [examId]: 삭제시각ISO }
     lastBackupAt: null,
   }
 }
@@ -52,24 +99,88 @@ export function normalizeProblem(raw) {
   }
 }
 
-export function normalizeState(raw) {
-  if (!raw || typeof raw !== 'object') return emptyState()
-  const problems = Array.isArray(raw.problems) ? raw.problems.map(normalizeProblem) : []
-  let subjects = Array.isArray(raw.subjects) && raw.subjects.length ? raw.subjects : [...DEFAULT_SUBJECTS]
+export function normalizeExam(raw) {
+  const src = raw && typeof raw === 'object' ? raw : {}
+  const problems = Array.isArray(src.problems) ? src.problems.map(normalizeProblem) : []
+  let subjects = Array.isArray(src.subjects) && src.subjects.length ? [...src.subjects] : [...NEW_EXAM_SUBJECTS]
   // 문제에만 존재하는 과목도 목록에 포함시킨다 (가져오기 후 유실 방지)
-  for (const p of problems) if (!subjects.includes(p.subject)) subjects = [...subjects, p.subject]
-  const logs = Array.isArray(raw.logs)
-    ? raw.logs.filter((l) => l && typeof l.t === 'number').map((l) => ({ t: l.t, id: l.id, ok: !!l.ok }))
+  for (const p of problems) if (!subjects.includes(p.subject)) subjects.push(p.subject)
+  const logs = Array.isArray(src.logs)
+    ? src.logs.filter((l) => l && typeof l.t === 'number').map((l) => ({ t: l.t, id: l.id, ok: !!l.ok }))
     : []
   return {
-    version: SCHEMA_VERSION,
+    id: src.id || uid('exam'),
+    name: src.name || '새 시험',
+    examDate: typeof src.examDate === 'string' ? src.examDate : '',
+    metaUpdatedAt: src.metaUpdatedAt || EPOCH,
+    createdAt: src.createdAt || new Date().toISOString(),
     subjects,
-    subjectsUpdatedAt: raw.subjectsUpdatedAt || new Date(0).toISOString(),
+    subjectsUpdatedAt: src.subjectsUpdatedAt || EPOCH,
     problems,
     logs: pruneLogs(logs),
-    deleted: pruneTombstones(raw.deleted),
+    deleted: pruneTombstones(src.deleted),
+  }
+}
+
+/** 어떤 형태의 데이터든 현재 스키마로 보정한다 (v1 단일 노트 → 기본 시험으로 이관) */
+export function normalizeState(raw) {
+  if (!raw || typeof raw !== 'object') return emptyState()
+
+  let list
+  if (Array.isArray(raw.exams)) {
+    list = raw.exams.map(normalizeExam)
+  } else if (Array.isArray(raw.problems)) {
+    // v1 데이터 — 통째로 기본 시험에 담는다
+    list = [
+      normalizeExam({
+        id: DEFAULT_EXAM_ID,
+        name: DEFAULT_EXAM_NAME,
+        examDate: DEFAULT_EXAM_DATE,
+        metaUpdatedAt: EPOCH,
+        createdAt: EPOCH,
+        subjects: raw.subjects,
+        subjectsUpdatedAt: raw.subjectsUpdatedAt,
+        problems: raw.problems,
+        logs: raw.logs,
+        deleted: raw.deleted,
+      }),
+    ]
+  } else {
+    list = []
+  }
+
+  // id 중복 제거 (손상된 파일 방어)
+  const byId = new Map()
+  for (const e of list) if (!byId.has(e.id)) byId.set(e.id, e)
+  let exams = sortExams([...byId.values()])
+  if (!exams.length) exams = [defaultExam()]
+
+  const activeExamId = exams.some((e) => e.id === raw.activeExamId) ? raw.activeExamId : exams[0].id
+
+  return {
+    version: SCHEMA_VERSION,
+    activeExamId,
+    exams,
+    deletedExams: pruneTombstones(raw.deletedExams),
     lastBackupAt: raw.lastBackupAt || null,
   }
+}
+
+/** 만든 순서 고정 — 기기가 달라도 탭 순서가 같도록 */
+function sortExams(exams) {
+  return [...exams].sort((a, b) => {
+    const d = new Date(a.createdAt) - new Date(b.createdAt)
+    return d || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
+  })
+}
+
+export function activeExam(state) {
+  return state.exams.find((e) => e.id === state.activeExamId) || state.exams[0] || null
+}
+
+/** 시험 하나만 바꾼 새 상태 */
+export function updateExamIn(state, examId, fn) {
+  return { ...state, exams: state.exams.map((e) => (e.id === examId ? fn(e) : e)) }
 }
 
 export function pruneLogs(logs) {
@@ -118,16 +229,17 @@ export function recomputeStats(problems, logs) {
 }
 
 /**
- * 로컬 상태와 원격 상태를 합친다.
+ * 같은 시험(노트) 하나를 합친다.
+ *  - 이름/시험일: metaUpdatedAt이 최신인 쪽 채택
  *  - 문제 내용: updatedAt이 최신인 쪽 채택
  *  - 삭제: tombstone이 문제의 updatedAt보다 나중이면 삭제 확정
  *  - 통계: 합쳐진 로그로부터 재계산
  *  - 과목 목록: subjectsUpdatedAt이 최신인 쪽 채택 (이름 변경이 되살아나지 않도록)
  */
-export function mergeStates(local, remote) {
-  if (!remote) return normalizeState(local)
-  const a = normalizeState(local)
-  const b = normalizeState(remote)
+export function mergeExams(local, remote) {
+  const a = normalizeExam(local)
+  if (!remote) return a
+  const b = normalizeExam(remote)
 
   const deleted = { ...b.deleted }
   for (const [id, iso] of Object.entries(a.deleted)) {
@@ -155,18 +267,69 @@ export function mergeStates(local, remote) {
   }
   const mergedLogs = pruneLogs(logs)
 
-  const localNewer = new Date(a.subjectsUpdatedAt) >= new Date(b.subjectsUpdatedAt)
-  const subjectSource = localNewer ? a : b
+  const subjectSource = new Date(a.subjectsUpdatedAt) >= new Date(b.subjectsUpdatedAt) ? a : b
   const subjects = [...subjectSource.subjects]
   for (const p of problems) if (!subjects.includes(p.subject)) subjects.push(p.subject)
 
+  const metaSource = new Date(a.metaUpdatedAt) >= new Date(b.metaUpdatedAt) ? a : b
+
   return {
-    version: SCHEMA_VERSION,
+    id: a.id,
+    name: metaSource.name,
+    examDate: metaSource.examDate,
+    metaUpdatedAt: metaSource.metaUpdatedAt,
+    createdAt: new Date(a.createdAt) <= new Date(b.createdAt) ? a.createdAt : b.createdAt,
     subjects,
     subjectsUpdatedAt: subjectSource.subjectsUpdatedAt,
     problems: recomputeStats(problems, mergedLogs),
     logs: mergedLogs,
     deleted: pruneTombstones(deleted),
+  }
+}
+
+/** 시험을 마지막으로 손댄 시각 — 삭제 기록과 비교해 되살릴지 판단하는 기준 */
+function examTouchedAt(exam) {
+  let t = Math.max(new Date(exam.metaUpdatedAt).getTime() || 0, new Date(exam.subjectsUpdatedAt).getTime() || 0)
+  for (const p of exam.problems) t = Math.max(t, new Date(p.updatedAt).getTime() || 0)
+  for (const iso of Object.values(exam.deleted)) t = Math.max(t, new Date(iso).getTime() || 0)
+  return t
+}
+
+/**
+ * 로컬 전체와 원격 전체를 합친다.
+ * 시험은 id로 짝지어 각각 합치고, 한쪽에만 있으면 그대로 가져온다.
+ * 단 삭제된 시험은 그 뒤로 손댄 흔적이 없으면 되살리지 않는다.
+ */
+export function mergeStates(local, remote) {
+  const a = normalizeState(local)
+  if (!remote) return a
+  const b = normalizeState(remote)
+
+  const deletedExams = { ...b.deletedExams }
+  for (const [id, iso] of Object.entries(a.deletedExams)) {
+    if (!deletedExams[id] || new Date(iso) > new Date(deletedExams[id])) deletedExams[id] = iso
+  }
+
+  const localById = new Map(a.exams.map((e) => [e.id, e]))
+  const remoteById = new Map(b.exams.map((e) => [e.id, e]))
+  const merged = []
+  for (const id of new Set([...localById.keys(), ...remoteById.keys()])) {
+    const l = localById.get(id)
+    const exam = l ? mergeExams(l, remoteById.get(id)) : normalizeExam(remoteById.get(id))
+    const tomb = deletedExams[id]
+    if (tomb && new Date(tomb).getTime() > examTouchedAt(exam)) continue // 삭제 확정
+    merged.push(exam)
+  }
+
+  let exams = sortExams(merged)
+  if (!exams.length) exams = [defaultExam()]
+  const activeExamId = exams.some((e) => e.id === a.activeExamId) ? a.activeExamId : exams[0].id
+
+  return {
+    version: SCHEMA_VERSION,
+    activeExamId, // 보고 있는 탭은 기기마다 다르므로 로컬 것을 유지
+    exams,
+    deletedExams: pruneTombstones(deletedExams),
     lastBackupAt: a.lastBackupAt || b.lastBackupAt || null,
   }
 }
@@ -300,11 +463,25 @@ export function markDirty() {
   saveSyncMeta({ ...loadSyncMeta(), dirty: true })
 }
 
-/* ---------- 퀴즈 세션 ---------- */
+/* ---------- 퀴즈 세션 (시험별로 따로 보관) ---------- */
 
-export function loadSession() {
+function sessionKey(examId) {
+  return `${SESSION_KEY}:${examId}`
+}
+
+export function loadSession(examId) {
+  if (!examId) return null
   try {
-    const raw = localStorage.getItem(SESSION_KEY)
+    let raw = localStorage.getItem(sessionKey(examId))
+    // v1 세션(단일 노트)은 기본 시험 것으로 옮긴다
+    if (!raw && examId === DEFAULT_EXAM_ID) {
+      const old = localStorage.getItem(SESSION_KEY)
+      if (old) {
+        localStorage.setItem(sessionKey(examId), old)
+        localStorage.removeItem(SESSION_KEY)
+        raw = old
+      }
+    }
     if (!raw) return null
     const s = JSON.parse(raw)
     if (!s || !Array.isArray(s.queue) || !Array.isArray(s.results)) return null
@@ -314,11 +491,22 @@ export function loadSession() {
   }
 }
 
-export function saveSession(session) {
+export function saveSession(examId, session) {
+  if (!examId) return
   try {
-    if (!session) localStorage.removeItem(SESSION_KEY)
-    else localStorage.setItem(SESSION_KEY, JSON.stringify(session))
+    if (!session) localStorage.removeItem(sessionKey(examId))
+    else localStorage.setItem(sessionKey(examId), JSON.stringify(session))
   } catch (e) {
     console.error('세션 저장 실패', e)
+  }
+}
+
+/** 진행 중 세션을 한꺼번에 폐기 (복원·초기화 뒤에는 데이터와 어긋나므로) */
+export function clearSessions(examIds) {
+  for (const id of examIds) saveSession(id, null)
+  try {
+    localStorage.removeItem(SESSION_KEY)
+  } catch {
+    /* 무시 */
   }
 }

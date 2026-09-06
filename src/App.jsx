@@ -1,23 +1,28 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import HomeTab from './tabs/HomeTab'
 import QuizTab from './tabs/QuizTab'
 import AddTab from './tabs/AddTab'
 import ManageTab from './tabs/ManageTab'
+import ExamBar, { ExamFormDialog } from './components/ExamBar'
 import { cls, dayKey, uid } from './lib/util'
 import {
+  activeExam,
   clearGitHubConfig,
+  clearSessions,
   loadGitHubConfig,
   loadState,
   loadSyncMeta,
+  makeExam,
   markDirty,
+  normalizeExam,
   normalizeProblem,
   normalizeState,
   pruneLogs,
   requestPersistentStorage,
   saveGitHubConfig,
   saveState,
-  saveSession,
   SCHEMA_VERSION,
+  updateExamIn,
 } from './lib/store'
 import { syncOnce } from './lib/sync'
 import { clearImages, deleteImage, getAllImages, putImage, putImages } from './lib/imagedb'
@@ -35,6 +40,7 @@ export default function App() {
   const [focusMode, setFocusMode] = useState(false)
   const [quizRequest, setQuizRequest] = useState(null)
   const [managePanel, setManagePanel] = useState(null)
+  const [examDialog, setExamDialog] = useState(null) // { mode: 'create' } | { mode: 'edit', exam }
   const [toastMsg, setToastMsg] = useState(null)
   const firstRender = useRef(true)
 
@@ -46,6 +52,10 @@ export default function App() {
   const stateRef = useRef(state)
   const syncingRef = useRef(false)
   const syncTimer = useRef(null)
+
+  /* 지금 보고 있는 시험(노트) — 모든 탭은 이 하나만 다룬다 */
+  const exam = activeExam(state)
+  const examView = useMemo(() => ({ ...exam, lastBackupAt: state.lastBackupAt }), [exam, state.lastBackupAt])
 
   useEffect(() => {
     stateRef.current = state
@@ -70,7 +80,8 @@ export default function App() {
 
   useEffect(() => {
     if (!toastMsg) return
-    const t = setTimeout(() => setToastMsg(null), 3200)
+    // 오류는 읽을 시간이 필요하므로 오래 띄운다
+    const t = setTimeout(() => setToastMsg(null), toastMsg.kind === 'error' ? 9000 : 3200)
     return () => clearTimeout(t)
   }, [toastMsg])
 
@@ -82,6 +93,9 @@ export default function App() {
 
   const onFocusMode = useCallback((v) => setFocusMode(v), [])
   const onRequestHandled = useCallback(() => setQuizRequest(null), [])
+
+  /** 활성 시험 하나만 바꾼다 */
+  const patchExam = useCallback((fn) => setState((s) => updateExamIn(s, s.activeExamId, fn)), [])
 
   /* ---------- 동기화 ---------- */
 
@@ -105,8 +119,8 @@ export default function App() {
         }
       } catch (e) {
         // 자동 동기화 실패는 조용히 넘긴다 (오프라인일 수 있음) — 수동 실행일 때만 알림
+        console.error('동기화 실패:', e)
         if (notify) toast(e?.message || '동기화에 실패했습니다.', 'error')
-        else console.warn('자동 동기화 실패:', e?.message || e)
       } finally {
         setSyncStatus('')
         syncingRef.current = false
@@ -164,6 +178,71 @@ export default function App() {
     toast('동기화를 해제했습니다.')
   }, [toast])
 
+  /* ---------- 시험(노트) ---------- */
+
+  const selectExam = useCallback((id) => {
+    setState((s) => (s.activeExamId === id ? s : { ...s, activeExamId: id }))
+    setManagePanel(null)
+    window.scrollTo({ top: 0 })
+  }, [])
+
+  const createExam = useCallback(
+    (data) => {
+      const created = makeExam(data)
+      setState((s) => ({ ...s, exams: [...s.exams, created], activeExamId: created.id }))
+      setExamDialog(null)
+      goTab('home')
+      scheduleSync()
+      toast(`"${created.name}" 오답노트를 만들었습니다.`)
+    },
+    [goTab, scheduleSync, toast],
+  )
+
+  const updateExamMeta = useCallback(
+    (id, { name, examDate }) => {
+      setState((s) =>
+        updateExamIn(s, id, (e) => ({
+          ...e,
+          name: name?.trim() || e.name,
+          examDate: examDate || '',
+          metaUpdatedAt: new Date().toISOString(),
+        })),
+      )
+      setExamDialog(null)
+      scheduleSync()
+      toast('시험 정보를 수정했습니다.')
+    },
+    [scheduleSync, toast],
+  )
+
+  const deleteExam = useCallback(
+    async (id) => {
+      const target = state.exams.find((e) => e.id === id)
+      if (!target) return
+      if (state.exams.length <= 1) {
+        toast('시험은 최소 1개 필요합니다.', 'error')
+        return
+      }
+      for (const p of target.problems) {
+        if (p.imageId) await deleteImage(p.imageId).catch(() => {})
+      }
+      clearSessions([id])
+      // 삭제 기록을 남겨야 다른 기기와 합칠 때 지운 시험이 되살아나지 않는다.
+      setState((s) => {
+        const exams = s.exams.filter((e) => e.id !== id)
+        return {
+          ...s,
+          exams,
+          activeExamId: s.activeExamId === id ? exams[0].id : s.activeExamId,
+          deletedExams: { ...s.deletedExams, [id]: new Date().toISOString() },
+        }
+      })
+      scheduleSync()
+      toast(`"${target.name}" 오답노트를 삭제했습니다.`)
+    },
+    [state.exams, scheduleSync, toast],
+  )
+
   /* ---------- 문제 CRUD ---------- */
 
   const createProblem = useCallback(
@@ -181,17 +260,17 @@ export default function App() {
       }
       const now = new Date().toISOString()
       const problem = normalizeProblem({ ...rest, id: uid(), imageId, createdAt: now, updatedAt: now })
-      setState((s) => ({ ...s, problems: [...s.problems, problem] }))
+      patchExam((e) => ({ ...e, problems: [...e.problems, problem] }))
       scheduleSync()
       toast('등록되었습니다.')
     },
-    [scheduleSync, toast],
+    [patchExam, scheduleSync, toast],
   )
 
   const updateProblem = useCallback(
     async (id, data) => {
       const { _image, ...rest } = data
-      const prev = state.problems.find((p) => p.id === id)
+      const prev = exam.problems.find((p) => p.id === id)
       if (!prev) return
 
       let imageId = prev.imageId
@@ -207,9 +286,9 @@ export default function App() {
         toast('이미지 처리에 실패했습니다.', 'error')
       }
 
-      setState((s) => ({
-        ...s,
-        problems: s.problems.map((p) =>
+      patchExam((e) => ({
+        ...e,
+        problems: e.problems.map((p) =>
           p.id === id
             ? normalizeProblem({ ...p, ...rest, imageId, updatedAt: new Date().toISOString() })
             : p,
@@ -218,67 +297,70 @@ export default function App() {
       scheduleSync()
       toast('수정되었습니다.')
     },
-    [state.problems, scheduleSync, toast],
+    [exam.problems, patchExam, scheduleSync, toast],
   )
 
   const deleteProblem = useCallback(
     async (id) => {
-      const target = state.problems.find((p) => p.id === id)
+      const target = exam.problems.find((p) => p.id === id)
       if (target?.imageId) await deleteImage(target.imageId).catch(() => {})
       // 삭제 기록을 남겨야 다른 기기와 합칠 때 지운 문제가 되살아나지 않는다.
       // 학습 로그는 남긴다 — 7일 학습량 그래프는 "그날 얼마나 풀었나"의 기록이므로.
-      setState((s) => ({
-        ...s,
-        problems: s.problems.filter((p) => p.id !== id),
-        deleted: { ...s.deleted, [id]: new Date().toISOString() },
+      patchExam((e) => ({
+        ...e,
+        problems: e.problems.filter((p) => p.id !== id),
+        deleted: { ...e.deleted, [id]: new Date().toISOString() },
       }))
       scheduleSync()
       toast('삭제되었습니다.')
     },
-    [state.problems, scheduleSync, toast],
+    [exam.problems, patchExam, scheduleSync, toast],
   )
 
   /* ---------- 채점 기록 ---------- */
 
-  const recordAnswer = useCallback((id, ok) => {
-    const now = new Date().toISOString()
-    setState((s) => ({
-      ...s,
-      problems: s.problems.map((p) =>
-        p.id === id
-          ? {
-              ...p,
-              attempts: p.attempts + 1,
-              correctCount: p.correctCount + (ok ? 1 : 0),
-              streak: ok ? (p.streak || 0) + 1 : 0,
-              lastAttemptedAt: now,
-              lastResult: ok,
-            }
-          : p,
-      ),
-      logs: pruneLogs([...s.logs, { t: Date.now(), id, ok }]),
-    }))
-    scheduleSync()
-  }, [scheduleSync])
+  const recordAnswer = useCallback(
+    (id, ok) => {
+      const now = new Date().toISOString()
+      patchExam((e) => ({
+        ...e,
+        problems: e.problems.map((p) =>
+          p.id === id
+            ? {
+                ...p,
+                attempts: p.attempts + 1,
+                correctCount: p.correctCount + (ok ? 1 : 0),
+                streak: ok ? (p.streak || 0) + 1 : 0,
+                lastAttemptedAt: now,
+                lastResult: ok,
+              }
+            : p,
+        ),
+        logs: pruneLogs([...e.logs, { t: Date.now(), id, ok }]),
+      }))
+      scheduleSync()
+    },
+    [patchExam, scheduleSync],
+  )
 
   /* ---------- 과목 ---------- */
 
   const changeSubjects = useCallback(
     (subjects, rename) => {
       const now = new Date().toISOString()
-      setState((s) => ({
-        ...s,
+      patchExam((e) => ({
+        ...e,
         subjects,
         subjectsUpdatedAt: now,
         problems: rename
-          ? s.problems.map((p) =>
+          ? e.problems.map((p) =>
               p.subject === rename.from ? { ...p, subject: rename.to, updatedAt: now } : p,
             )
-          : s.problems,
+          : e.problems,
       }))
       scheduleSync()
     },
-    [scheduleSync],
+    [patchExam, scheduleSync],
   )
 
   /* ---------- 백업 / 복원 ---------- */
@@ -302,21 +384,19 @@ export default function App() {
         }
       }
 
+      // 백업은 항상 모든 시험을 통째로 담는다 (일부만 담으면 복원 때 나머지가 사라진 것처럼 보인다)
       const payload = {
         app: 'ox-wrongnote',
         version: SCHEMA_VERSION,
         exportedAt: new Date().toISOString(),
-        subjects: state.subjects,
-        subjectsUpdatedAt: state.subjectsUpdatedAt,
-        problems: state.problems,
-        logs: state.logs,
-        deleted: state.deleted,
+        exams: state.exams,
+        deletedExams: state.deletedExams,
         images: {},
       }
       if (withImages) {
         try {
           const all = await getAllImages()
-          const used = new Set(state.problems.map((p) => p.imageId).filter(Boolean))
+          const used = new Set(state.exams.flatMap((e) => e.problems.map((p) => p.imageId)).filter(Boolean))
           payload.images = Object.fromEntries(Object.entries(all).filter(([k]) => used.has(k)))
         } catch {
           toast('이미지를 불러오지 못해 텍스트만 내보냅니다.', 'error')
@@ -374,63 +454,84 @@ export default function App() {
         toast('JSON 형식이 올바르지 않습니다.', 'error')
         return
       }
-      if (!payload || !Array.isArray(payload.problems)) {
+      if (!payload || (!Array.isArray(payload.problems) && !Array.isArray(payload.exams))) {
         toast('오답노트 백업 파일이 아닙니다.', 'error')
         return
       }
 
-      const incoming = payload.problems.map(normalizeProblem)
+      // 옛 백업(단일 노트)은 normalizeState가 기본 시험으로 옮겨 준다
+      const incoming = normalizeState(payload)
       const images = payload.images && typeof payload.images === 'object' ? payload.images : {}
 
       if (mode === 'replace') {
-        const next = normalizeState({
-          subjects: payload.subjects,
-          subjectsUpdatedAt: payload.subjectsUpdatedAt,
-          problems: incoming,
-          logs: payload.logs,
-          deleted: payload.deleted,
-        })
         try {
           await clearImages()
           await putImages(images)
         } catch {
           toast('이미지 복원에 실패했습니다.', 'error')
         }
-        setState(next)
-        saveSession(null) // 진행 중 세션은 데이터와 어긋나므로 폐기
+        clearSessions([...state.exams.map((e) => e.id), ...incoming.exams.map((e) => e.id)])
+        setState({
+          ...incoming,
+          activeExamId: incoming.exams.some((e) => e.id === state.activeExamId)
+            ? state.activeExamId
+            : incoming.activeExamId,
+          lastBackupAt: state.lastBackupAt,
+        })
         scheduleSync()
-        toast(`전체 교체 완료 — 문제 ${incoming.length}개`)
+        toast(
+          `전체 교체 완료 — 시험 ${incoming.exams.length}개 · 문제 ${incoming.exams.reduce(
+            (n, e) => n + e.problems.length,
+            0,
+          )}개`,
+        )
         return
       }
 
       // 집계는 setState 밖에서 (업데이터가 두 번 호출돼도 개수가 어긋나지 않도록)
       let added = 0
       let updated = 0
+      let newExams = 0
       const acceptedImageIds = new Set()
-      const map = new Map(state.problems.map((p) => [p.id, p]))
-      for (const p of incoming) {
-        if (map.has(p.id)) {
-          if (mode !== 'overwrite') continue
-          map.set(p.id, p)
-          updated++
-        } else {
-          map.set(p.id, p)
-          added++
+      const now = new Date().toISOString()
+      const exams = [...state.exams]
+
+      for (const inc of incoming.exams) {
+        const idx = exams.findIndex((e) => e.id === inc.id)
+
+        if (idx < 0) {
+          // 이 기기에 없는 시험은 통째로 추가
+          exams.push(inc)
+          newExams++
+          added += inc.problems.length
+          for (const p of inc.problems) if (p.imageId) acceptedImageIds.add(p.imageId)
+          continue
         }
-        if (p.imageId) acceptedImageIds.add(p.imageId)
+
+        const cur = exams[idx]
+        const map = new Map(cur.problems.map((p) => [p.id, p]))
+        for (const p of inc.problems) {
+          if (map.has(p.id)) {
+            if (mode !== 'overwrite') continue
+            map.set(p.id, p)
+            updated++
+          } else {
+            map.set(p.id, p)
+            added++
+          }
+          if (p.imageId) acceptedImageIds.add(p.imageId)
+        }
+        exams[idx] = normalizeExam({
+          ...cur,
+          subjects: [...new Set([...cur.subjects, ...inc.subjects])],
+          subjectsUpdatedAt: now,
+          deleted: { ...inc.deleted, ...cur.deleted },
+          problems: [...map.values()],
+          logs: pruneLogs([...cur.logs, ...inc.logs].sort((a, b) => a.t - b.t)),
+        })
       }
-      const merged = normalizeState({
-        subjects: [...new Set([...state.subjects, ...(payload.subjects || [])])],
-        subjectsUpdatedAt: new Date().toISOString(),
-        deleted: { ...(payload.deleted || {}), ...state.deleted },
-        problems: [...map.values()],
-        logs: pruneLogs(
-          [...state.logs, ...(Array.isArray(payload.logs) ? payload.logs : [])]
-            .filter((l) => l && typeof l.t === 'number')
-            .sort((a, b) => a.t - b.t),
-        ),
-      })
-      setState(merged)
+
+      setState((s) => ({ ...s, exams }))
 
       try {
         await putImages(Object.fromEntries(Object.entries(images).filter(([k]) => acceptedImageIds.has(k))))
@@ -438,15 +539,20 @@ export default function App() {
         toast('이미지 복원에 실패했습니다.', 'error')
       }
       scheduleSync()
-      toast(`가져오기 완료 — 추가 ${added}개${mode === 'overwrite' ? `, 갱신 ${updated}개` : ''}`)
+      toast(
+        `가져오기 완료 — 추가 ${added}개${mode === 'overwrite' ? `, 갱신 ${updated}개` : ''}${
+          newExams ? `, 새 시험 ${newExams}개` : ''
+        }`,
+      )
     },
     [state, scheduleSync, toast],
   )
 
   const resetStats = useCallback(() => {
-    setState((s) => ({
-      ...s,
-      problems: s.problems.map((p) => ({
+    const examId = state.activeExamId
+    patchExam((e) => ({
+      ...e,
+      problems: e.problems.map((p) => ({
         ...p,
         attempts: 0,
         correctCount: 0,
@@ -456,30 +562,42 @@ export default function App() {
       })),
       logs: [],
     }))
-    saveSession(null)
+    clearSessions([examId])
     scheduleSync()
-    toast('풀이 기록을 초기화했습니다.')
-  }, [scheduleSync, toast])
+    toast('이 시험의 풀이 기록을 초기화했습니다.')
+  }, [state.activeExamId, patchExam, scheduleSync, toast])
 
   /* ---------- 렌더 ---------- */
 
   return (
     <div className="mx-auto min-h-screen max-w-2xl bg-slate-100">
+      {!focusMode && (
+        <ExamBar
+          exams={state.exams}
+          activeExamId={state.activeExamId}
+          onSelect={selectExam}
+          onAdd={() => setExamDialog({ mode: 'create' })}
+        />
+      )}
+
       <main className={cls(focusMode ? 'pb-0' : 'pb-[calc(72px+env(safe-area-inset-bottom))]')}>
         {tab === 'home' && (
           <HomeTab
-            state={state}
+            state={examView}
             onGoTab={goTab}
             onStartWeakQuiz={() => {
               setQuizRequest({ scope: 'weak', count: 'all' })
               goTab('quiz')
             }}
             onGoBackup={() => goTab('manage', { panel: 'backup' })}
+            onEditExam={() => setExamDialog({ mode: 'edit', exam })}
           />
         )}
         {tab === 'quiz' && (
           <QuizTab
-            state={state}
+            key={exam.id}
+            examId={exam.id}
+            state={examView}
             onAnswer={recordAnswer}
             onFocusMode={onFocusMode}
             onGoTab={goTab}
@@ -487,10 +605,11 @@ export default function App() {
             onRequestHandled={onRequestHandled}
           />
         )}
-        {tab === 'add' && <AddTab state={state} onCreate={createProblem} />}
+        {tab === 'add' && <AddTab key={exam.id} state={examView} onCreate={createProblem} />}
         {tab === 'manage' && (
           <ManageTab
-            state={state}
+            key={exam.id}
+            state={examView}
             initialPanel={managePanel}
             onUpdate={updateProblem}
             onDelete={deleteProblem}
@@ -499,6 +618,17 @@ export default function App() {
             onImport={importData}
             onResetStats={resetStats}
             toast={toast}
+            examProps={{
+              exams: state.exams,
+              activeExamId: state.activeExamId,
+              onSelect: (id) => {
+                selectExam(id)
+                setManagePanel('exams') // 패널 안에서 바꿨으니 그대로 열어둔다
+              },
+              onAdd: () => setExamDialog({ mode: 'create' }),
+              onEdit: (target) => setExamDialog({ mode: 'edit', exam: target }),
+              onDelete: deleteExam,
+            }}
             syncProps={{
               config: ghConfig,
               meta: syncMeta,
@@ -511,6 +641,15 @@ export default function App() {
           />
         )}
       </main>
+
+      <ExamFormDialog
+        open={!!examDialog}
+        initial={examDialog?.mode === 'edit' ? examDialog.exam : null}
+        onCancel={() => setExamDialog(null)}
+        onSubmit={(data) =>
+          examDialog?.mode === 'edit' ? updateExamMeta(examDialog.exam.id, data) : createExam(data)
+        }
+      />
 
       {!focusMode && (
         <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur">

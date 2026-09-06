@@ -11,10 +11,10 @@ const COUNTS = [
   { value: 'all', label: '전체' },
 ]
 
-export default function QuizTab({ state, onAnswer, onFocusMode, onGoTab, request, onRequestHandled }) {
+export default function QuizTab({ examId, state, onAnswer, onFocusMode, onGoTab, request, onRequestHandled }) {
   const { problems, subjects } = state
 
-  const [session, setSession] = useState(() => loadSession())
+  const [session, setSession] = useState(() => loadSession(examId))
   const [showSetup, setShowSetup] = useState(false)
   const [scope, setScope] = useState('all')
   const [subject, setSubject] = useState(subjects[0] || '')
@@ -22,10 +22,13 @@ export default function QuizTab({ state, onAnswer, onFocusMode, onGoTab, request
 
   const byId = useMemo(() => new Map(problems.map((p) => [p.id, p])), [problems])
 
-  const update = useCallback((next) => {
-    setSession(next)
-    saveSession(next)
-  }, [])
+  const update = useCallback(
+    (next) => {
+      setSession(next)
+      saveSession(examId, next)
+    },
+    [examId],
+  )
 
   const start = useCallback(
     (opts) => {

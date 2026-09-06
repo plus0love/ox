@@ -10,14 +10,19 @@ export function cls(...args) {
 
 export const CHOICE_LABELS = ['①', '②', '③', '④']
 
-export const EXAM_DATE = '2026-09-05'
-
-/** 시험일까지 남은 일수 (오늘 0시 기준) */
-export function daysUntilExam(today = new Date()) {
+/** 시험일까지 남은 일수 (오늘 0시 기준). 시험일이 없으면 null */
+export function daysUntilExam(examDate, today = new Date()) {
+  if (!examDate) return null
+  const [y, m, d] = String(examDate).split('-').map(Number)
+  if (!y || !m || !d) return null
   const t = new Date(today.getFullYear(), today.getMonth(), today.getDate())
-  const [y, m, d] = EXAM_DATE.split('-').map(Number)
   const exam = new Date(y, m - 1, d)
   return Math.round((exam - t) / 86400000)
+}
+
+/** 'YYYY-MM-DD' -> 'YYYY. MM. DD' */
+export function formatExamDate(examDate) {
+  return examDate ? String(examDate).replace(/-/g, '. ') : ''
 }
 
 /** Date -> 'YYYY-MM-DD' (로컬 기준) */

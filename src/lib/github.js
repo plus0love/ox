@@ -10,14 +10,27 @@ const DATA_PATH = 'data.json'
 const IMAGE_DIR = 'images'
 
 export class GitHubError extends Error {
-  constructor(message, status) {
+  constructor(message, status, endpoint) {
     super(message)
     this.name = 'GitHubError'
     this.status = status
+    this.endpoint = endpoint || null
   }
 }
 
+/** 오류 메시지에 붙일 짧은 요청 이름 — 어디서 막혔는지 바로 보이도록 */
+function endpointLabel(method, path) {
+  if (/\/git\/ref/.test(path)) return method === 'GET' ? '브랜치 조회' : '브랜치 이동(쓰기)'
+  if (/\/git\/trees/.test(path)) return method === 'GET' ? '파일 목록 조회' : '트리 생성(쓰기)'
+  if (/\/git\/blobs/.test(path)) return method === 'GET' ? '파일 내용 조회' : '파일 생성(쓰기)'
+  if (/\/git\/commits/.test(path)) return method === 'GET' ? '커밋 조회' : '커밋 생성(쓰기)'
+  if (/^\/repos\/[^/]+\/[^/]+$/.test(path)) return '저장소 조회'
+  return path
+}
+
 async function req(cfg, path, options = {}) {
+  const method = options.method || 'GET'
+  const where = endpointLabel(method, path)
   let res
   try {
     res = await fetch(`${API}${path}`, {
@@ -31,21 +44,32 @@ async function req(cfg, path, options = {}) {
       },
     })
   } catch {
-    throw new GitHubError('네트워크에 연결할 수 없습니다.', 0)
+    throw new GitHubError(`네트워크에 연결할 수 없습니다. (${where})`, 0, where)
   }
 
   if (!res.ok) {
-    let msg = `요청 실패 (${res.status})`
+    let raw = ''
     try {
       const body = await res.json()
-      if (body?.message) msg = body.message
+      raw = body?.message || ''
     } catch {
       /* 본문 없음 */
     }
-    if (res.status === 401) msg = '토큰이 올바르지 않거나 만료되었습니다.'
-    if (res.status === 403 && /rate limit/i.test(msg)) msg = 'GitHub 요청 한도를 초과했습니다. 잠시 후 다시 시도하세요.'
-    if (res.status === 404) msg = '저장소를 찾을 수 없습니다. 소유자/저장소 이름과 토큰 권한을 확인하세요.'
-    throw new GitHubError(msg, res.status)
+
+    let msg = raw || `요청 실패 (${res.status})`
+    if (res.status === 401) {
+      msg = '토큰이 올바르지 않거나 만료되었습니다. 토큰을 다시 발급해 입력하세요.'
+    } else if (res.status === 403 && /rate limit/i.test(raw)) {
+      msg = 'GitHub 요청 한도를 초과했습니다. 잠시 후 다시 시도하세요.'
+    } else if (res.status === 403) {
+      msg = '토큰 권한이 부족합니다. 토큰 설정에서 Contents를 "Read and write"로 바꿔 주세요.'
+    } else if (res.status === 404) {
+      msg = '저장소를 찾을 수 없습니다. 소유자/저장소 이름과 토큰의 저장소 선택을 확인하세요.'
+    }
+
+    // 어느 요청에서 막혔는지 항상 남긴다 — 원인 추적의 핵심
+    console.error(`[GitHub ${res.status}] ${method} ${path}`, raw)
+    throw new GitHubError(`${msg} (${where} / ${res.status})`, res.status, where)
   }
   return res.status === 204 ? null : res.json()
 }

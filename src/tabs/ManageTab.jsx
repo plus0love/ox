@@ -3,7 +3,8 @@ import ProblemForm from '../components/ProblemForm'
 import ProblemImage from '../components/ProblemImage'
 import SyncPanel from '../components/SyncPanel'
 import { Button, Card, ChipGroup, ConfirmDialog, EmptyState, SectionTitle, inputCls } from '../components/ui'
-import { CHOICE_LABELS, accuracy, cls, formatDate, humanSize } from '../lib/util'
+import { ddayLabel } from '../components/ExamBar'
+import { CHOICE_LABELS, accuracy, cls, daysUntilExam, formatDate, formatExamDate, humanSize } from '../lib/util'
 import { getStorageInfo, usedBytes } from '../lib/store'
 
 export default function ManageTab({
@@ -16,13 +17,14 @@ export default function ManageTab({
   onImport,
   onResetStats,
   toast,
+  examProps,
   syncProps,
 }) {
   const [q, setQ] = useState('')
   const [filter, setFilter] = useState('전체')
   const [editing, setEditing] = useState(null)
   const [confirmDelete, setConfirmDelete] = useState(null)
-  const [panel, setPanel] = useState(initialPanel ?? null) // 'backup' | 'subjects' | null
+  const [panel, setPanel] = useState(initialPanel ?? null) // 'sync' | 'backup' | 'subjects' | 'exams' | null
 
   const filtered = useMemo(() => {
     const kw = q.trim().toLowerCase()
@@ -60,12 +62,15 @@ export default function ManageTab({
 
   return (
     <div className="space-y-4 p-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-black text-slate-800">문제 관리</h1>
-        <span className="text-[15px] text-slate-500">{state.problems.length}개</span>
+      <div className="flex items-end justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-black text-slate-800">문제 관리</h1>
+          <p className="truncate text-[14px] text-slate-500">{state.name}</p>
+        </div>
+        <span className="shrink-0 text-[15px] text-slate-500">{state.problems.length}개</span>
       </div>
 
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 gap-2">
         <Button
           variant="ghost"
           className="px-2 text-[14px]"
@@ -88,6 +93,13 @@ export default function ManageTab({
         >
           🏷️ 과목
         </Button>
+        <Button
+          variant="ghost"
+          className="px-2 text-[14px]"
+          onClick={() => setPanel(panel === 'exams' ? null : 'exams')}
+        >
+          📚 시험 관리
+        </Button>
       </div>
 
       {panel === 'sync' && syncProps && <SyncPanel {...syncProps} toast={toast} />}
@@ -95,6 +107,7 @@ export default function ManageTab({
         <BackupPanel state={state} onExport={onExport} onImport={onImport} onResetStats={onResetStats} toast={toast} />
       )}
       {panel === 'subjects' && <SubjectPanel state={state} onSubjectsChange={onSubjectsChange} toast={toast} />}
+      {panel === 'exams' && examProps && <ExamPanel {...examProps} />}
 
       {state.problems.length === 0 ? (
         <EmptyState icon="📂" title="등록된 문제가 없습니다" desc="등록 탭에서 오답을 추가해 주세요." />
@@ -298,7 +311,8 @@ function BackupPanel({ state, onExport, onImport, onResetStats, toast }) {
           </Button>
         </div>
         <p className="text-[13px] leading-relaxed text-slate-500">
-          iOS에서 파일 저장이 안 되면 클립보드로 복사한 뒤 메모앱에 붙여넣어 보관하세요.
+          백업 파일에는 모든 시험이 함께 담깁니다. iOS에서 파일 저장이 안 되면 클립보드로 복사한 뒤 메모앱에 붙여넣어
+          보관하세요.
         </p>
       </div>
 
@@ -358,14 +372,14 @@ function BackupPanel({ state, onExport, onImport, onResetStats, toast }) {
       <hr className="border-slate-100" />
 
       <Button variant="subtle" className="w-full text-red-600" onClick={() => setConfirmReset(true)}>
-        모든 풀이 기록 초기화 (문제는 유지)
+        이 시험의 풀이 기록 초기화 (문제는 유지)
       </Button>
 
       <ConfirmDialog
         open={confirmReset}
         danger
         title="풀이 기록을 초기화할까요?"
-        desc={`문제 ${state.problems.length}개는 그대로 두고\n시도 횟수 · 정답률 · 학습 기록만 지웁니다.`}
+        desc={`"${state.name}"의 문제 ${state.problems.length}개는 그대로 두고\n시도 횟수 · 정답률 · 학습 기록만 지웁니다.`}
         confirmLabel="초기화"
         onCancel={() => setConfirmReset(false)}
         onConfirm={() => {
@@ -490,6 +504,84 @@ function SubjectPanel({ state, onSubjectsChange, toast }) {
           추가
         </Button>
       </div>
+    </Card>
+  )
+}
+
+/* ---------------- 시험(노트) 관리 ---------------- */
+
+function ExamPanel({ exams, activeExamId, onSelect, onAdd, onEdit, onDelete }) {
+  const [confirmTarget, setConfirmTarget] = useState(null)
+
+  return (
+    <Card className="space-y-3">
+      <SectionTitle right={<span className="text-[13px] text-slate-400">{exams.length}개</span>}>
+        시험 관리
+      </SectionTitle>
+      <p className="text-[13.5px] leading-relaxed text-slate-500">
+        시험마다 문제 · 과목 · 풀이 기록이 따로 보관됩니다. 맨 위 탭에서 바로 오갈 수 있습니다.
+      </p>
+
+      <ul className="space-y-2">
+        {exams.map((e) => {
+          const active = e.id === activeExamId
+          return (
+            <li
+              key={e.id}
+              className={cls(
+                'rounded-xl px-3.5 py-3 ring-1',
+                active ? 'bg-slate-50 ring-slate-800' : 'bg-white ring-slate-200',
+              )}
+            >
+              <div className="flex items-center gap-2">
+                <button type="button" onClick={() => onSelect(e.id)} className="min-w-0 flex-1 text-left">
+                  <p className="truncate text-[16px] font-bold text-slate-800">
+                    {e.name}
+                    {active && <span className="ml-1.5 text-[12px] font-bold text-emerald-600">보는 중</span>}
+                  </p>
+                  <p className="text-[13px] text-slate-500">
+                    {e.examDate
+                      ? `${formatExamDate(e.examDate)} · ${ddayLabel(daysUntilExam(e.examDate))}`
+                      : '시험일 미설정'}{' '}
+                    · 문제 {e.problems.length}개
+                  </p>
+                </button>
+                <Button variant="subtle" className="min-h-[44px] px-3 text-sm" onClick={() => onEdit(e)}>
+                  수정
+                </Button>
+                <Button
+                  variant="subtle"
+                  className="min-h-[44px] px-3 text-sm text-red-600"
+                  onClick={() => setConfirmTarget(e)}
+                >
+                  삭제
+                </Button>
+              </div>
+            </li>
+          )
+        })}
+      </ul>
+
+      <Button variant="ghost" className="w-full" onClick={onAdd}>
+        ＋ 새 시험 추가
+      </Button>
+
+      <ConfirmDialog
+        open={!!confirmTarget}
+        danger
+        title="시험을 삭제할까요?"
+        desc={
+          confirmTarget
+            ? `"${confirmTarget.name}"의 문제 ${confirmTarget.problems.length}개와 풀이 기록이 모두 지워집니다.\n되돌릴 수 없습니다.`
+            : ''
+        }
+        confirmLabel="삭제"
+        onCancel={() => setConfirmTarget(null)}
+        onConfirm={() => {
+          onDelete(confirmTarget.id)
+          setConfirmTarget(null)
+        }}
+      />
     </Card>
   )
 }

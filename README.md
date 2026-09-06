@@ -1,6 +1,14 @@
-# 경찰 오답노트
+# 오답노트
 
-2026-09-05 경찰공무원 필기시험 대비 오답 반복학습 웹앱. 서버 없이 브라우저에만 저장됩니다.
+시험별 오답 반복학습 웹앱. 서버 없이 브라우저에만 저장됩니다.
+
+## 시험(노트) 전환
+
+화면 맨 위 탭에서 시험을 골라 오갑니다. **＋** 를 누르면 새 시험을 만들 수 있고,
+시험마다 **문제 · 과목 · 풀이 기록 · D-day가 완전히 따로** 보관됩니다.
+이름·시험일 수정과 삭제는 `관리 → 📚 시험 관리`(또는 홈의 D-day 카드를 눌러) 에서 합니다.
+
+기존에 쓰던 데이터는 첫 실행 때 **경찰공무원 필기시험(2026-09-05)** 노트로 그대로 옮겨집니다.
 
 ## 실행
 
@@ -38,6 +46,9 @@ ox-data  (private) data.json + images/  ← 실제 오답 데이터
 - **병합 규칙**
   | 대상 | 방식 |
   |---|---|
+  | 시험 목록 | id로 짝지어 각각 병합, 한쪽에만 있으면 가져옴 |
+  | 시험 이름·시험일 | `metaUpdatedAt`이 최신인 쪽 채택 |
+  | 시험 삭제 | tombstone(`deletedExams`)이 그 시험을 마지막으로 손댄 시각보다 나중이면 삭제 확정 |
   | 문제 내용 | `updatedAt`이 최신인 쪽 채택 |
   | 삭제 | tombstone(`deleted`)이 문제의 `updatedAt`보다 나중이면 삭제 확정 |
   | 풀이 통계 | 합쳐진 `logs`에서 **재계산** — 양쪽 풀이가 합산됨 |
@@ -53,8 +64,8 @@ ox-data  (private) data.json + images/  ← 실제 오답 데이터
 
 | 데이터 | 저장소 | 키 |
 |---|---|---|
-| 문제·통계·학습로그 | localStorage | `ox-wrongnote-v1` |
-| 진행 중 퀴즈 세션 | localStorage | `ox-wrongnote-session-v1` |
+| 시험 목록·문제·통계·학습로그 | localStorage | `ox-wrongnote-v1` |
+| 진행 중 퀴즈 세션 (시험별) | localStorage | `ox-wrongnote-session-v1:<시험id>` |
 | 동기화 설정(토큰) | localStorage | `ox-wrongnote-github-v1` |
 | 동기화 상태 | localStorage | `ox-wrongnote-syncmeta-v1` |
 | 첨부 이미지 | IndexedDB | `ox-wrongnote` / `images` |

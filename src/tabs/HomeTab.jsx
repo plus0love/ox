@@ -1,13 +1,13 @@
 import { useMemo, useState } from 'react'
 import { Button, Card, EmptyState, SectionTitle } from '../components/ui'
 import ProblemImage from '../components/ProblemImage'
-import { CHOICE_LABELS, cls, dayKey, daysUntilExam, EXAM_DATE, formatDate } from '../lib/util'
+import { CHOICE_LABELS, cls, dayKey, daysUntilExam, formatDate, formatExamDate } from '../lib/util'
 
 const WEEKDAY = ['일', '월', '화', '수', '목', '금', '토']
 
-export default function HomeTab({ state, onGoTab, onStartWeakQuiz, onGoBackup }) {
+export default function HomeTab({ state, onGoTab, onStartWeakQuiz, onGoBackup, onEditExam }) {
   const { problems, logs, subjects, lastBackupAt } = state
-  const dday = daysUntilExam()
+  const dday = daysUntilExam(state.examDate)
 
   // 백업 독촉: 한 번도 안 했거나 7일 넘었으면 눈에 띄게 알린다
   const backupWarn = useMemo(() => {
@@ -65,20 +65,30 @@ export default function HomeTab({ state, onGoTab, onStartWeakQuiz, onGoBackup })
 
   return (
     <div className="space-y-4 p-4">
-      {/* D-day */}
-      <div className="rounded-2xl bg-slate-800 p-5 text-white shadow-sm">
-        <div className="flex items-end justify-between">
-          <div>
-            <p className="text-[13px] font-medium tracking-wide text-slate-300">경찰공무원 필기시험</p>
-            <p className="text-sm text-slate-400">{EXAM_DATE.replace(/-/g, '. ')}</p>
-          </div>
-          <div className="text-right">
-            <p className="text-4xl leading-none font-black">
-              {dday > 0 ? `D-${dday}` : dday === 0 ? 'D-DAY' : `D+${-dday}`}
+      {/* D-day — 누르면 시험 이름·날짜 수정 */}
+      <button
+        type="button"
+        onClick={onEditExam}
+        className="w-full rounded-2xl bg-slate-800 p-5 text-left text-white shadow-sm active:bg-slate-900"
+      >
+        <div className="flex items-end justify-between gap-3">
+          <div className="min-w-0">
+            <p className="truncate text-[15px] font-bold tracking-wide text-slate-100">{state.name}</p>
+            <p className="text-sm text-slate-400">
+              {state.examDate ? formatExamDate(state.examDate) : '시험일 미설정 · 눌러서 설정하기'}
             </p>
           </div>
+          <div className="shrink-0 text-right">
+            {dday === null ? (
+              <p className="text-2xl leading-none font-black text-slate-500">D-?</p>
+            ) : (
+              <p className="text-4xl leading-none font-black">
+                {dday > 0 ? `D-${dday}` : dday === 0 ? 'D-DAY' : `D+${-dday}`}
+              </p>
+            )}
+          </div>
         </div>
-      </div>
+      </button>
 
       {backupWarn && (
         <button

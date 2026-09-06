@@ -23,18 +23,23 @@ import { loadSyncMeta, mergeStates, saveSyncMeta } from './store'
 
 const MAX_RETRY = 2
 
-/** 앱 데이터만 추출 (토큰 등 기기별 설정은 절대 올리지 않는다) */
+/**
+ * 앱 데이터만 추출 (토큰 등 기기별 설정은 절대 올리지 않는다).
+ * 지금 보고 있는 탭(activeExamId)도 기기마다 다르므로 올리지 않는다.
+ */
 function toRemotePayload(state) {
   return {
     app: 'ox-wrongnote',
     version: state.version,
     updatedAt: new Date().toISOString(),
-    subjects: state.subjects,
-    subjectsUpdatedAt: state.subjectsUpdatedAt,
-    problems: state.problems,
-    logs: state.logs,
-    deleted: state.deleted,
+    exams: state.exams,
+    deletedExams: state.deletedExams,
   }
+}
+
+/** 모든 시험의 문제를 한 줄로 (이미지 동기화용) */
+function allProblems(state) {
+  return state.exams.flatMap((e) => e.problems)
 }
 
 export async function verifyConnection(cfg) {
@@ -70,7 +75,7 @@ export async function syncOnce(cfg, state, opts = {}) {
 
     // 아직 원격에 없는 이미지 모으기
     const newImages = []
-    for (const p of merged.problems) {
+    for (const p of allProblems(merged)) {
       if (!p.imageId || hasRemoteImage(treeMap, p.imageId)) continue
       const dataUrl = await getImage(p.imageId)
       if (!dataUrl) continue
@@ -107,7 +112,7 @@ export async function syncOnce(cfg, state, opts = {}) {
     // 원격에만 있는 이미지 내려받기 (오프라인에서도 보이도록)
     onProgress('이미지 확인 중…')
     let pulledImages = 0
-    for (const p of merged.problems) {
+    for (const p of allProblems(merged)) {
       if (!p.imageId) continue
       if (await getImage(p.imageId)) continue
       const dataUrl = await readRemoteImage(cfg, treeMap, p.imageId)
@@ -127,16 +132,27 @@ export async function syncOnce(cfg, state, opts = {}) {
 /** 비교용 문자열 — 매번 바뀌는 updatedAt은 빼고, 순서 차이도 없앤다 */
 function comparable(state) {
   return JSON.stringify({
-    subjects: state.subjects,
-    subjectsUpdatedAt: state.subjectsUpdatedAt,
-    problems: [...state.problems].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)),
-    logs: state.logs,
-    deleted: Object.fromEntries(Object.entries(state.deleted || {}).sort()),
+    exams: [...state.exams]
+      .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+      .map((e) => ({
+        id: e.id,
+        name: e.name,
+        examDate: e.examDate,
+        metaUpdatedAt: e.metaUpdatedAt,
+        createdAt: e.createdAt,
+        subjects: e.subjects,
+        subjectsUpdatedAt: e.subjectsUpdatedAt,
+        problems: [...e.problems].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)),
+        logs: e.logs,
+        deleted: Object.fromEntries(Object.entries(e.deleted || {}).sort()),
+      })),
+    deletedExams: Object.fromEntries(Object.entries(state.deletedExams || {}).sort()),
   })
 }
 
 function commitMessage(state, imageCount) {
-  const parts = [`문제 ${state.problems.length}개`]
+  const problems = state.exams.reduce((n, e) => n + e.problems.length, 0)
+  const parts = [`시험 ${state.exams.length}개`, `문제 ${problems}개`]
   if (imageCount) parts.push(`이미지 +${imageCount}`)
   return `오답노트 동기화 — ${parts.join(', ')}`
 }
