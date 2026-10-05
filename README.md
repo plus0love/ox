@@ -68,6 +68,7 @@ ox-data  (private) data.json + images/  ← 실제 오답 데이터
 | 진행 중 퀴즈 세션 (시험별) | localStorage | `ox-wrongnote-session-v1:<시험id>` |
 | 동기화 설정(토큰) | localStorage | `ox-wrongnote-github-v1` |
 | 동기화 상태 | localStorage | `ox-wrongnote-syncmeta-v1` |
+| 화면 테마 (시스템/라이트/다크, 시스템이면 키 없음) | localStorage | `ox-wrongnote-theme-v1` |
 | 첨부 이미지 | IndexedDB | `ox-wrongnote` / `images` |
 | 원격 사본 | GitHub `ox-data` | `data.json`, `images/*.jpg` |
 

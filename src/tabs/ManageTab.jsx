@@ -6,6 +6,7 @@ import { Button, Card, ChipGroup, ConfirmDialog, EmptyState, SectionTitle, input
 import { ddayLabel } from '../components/ExamBar'
 import { CHOICE_LABELS, accuracy, cls, daysUntilExam, formatDate, formatExamDate, humanSize } from '../lib/util'
 import { getStorageInfo, usedBytes } from '../lib/store'
+import { THEME_OPTIONS } from '../lib/theme'
 
 export default function ManageTab({
   state,
@@ -19,6 +20,8 @@ export default function ManageTab({
   toast,
   examProps,
   syncProps,
+  theme,
+  onThemeChange,
 }) {
   const [q, setQ] = useState('')
   const [filter, setFilter] = useState('전체')
@@ -100,6 +103,27 @@ export default function ManageTab({
         >
           📚 시험 관리
         </Button>
+      </div>
+
+      {/* 화면 테마 — 설정 항목이 하나뿐이라 패널 대신 한 줄로 */}
+      <div className="flex min-h-[44px] items-center gap-3">
+        <span className="shrink-0 text-[15px] font-bold text-slate-700">🌓 화면</span>
+        <div className="flex flex-1 rounded-xl bg-slate-200/70 p-1">
+          {THEME_OPTIONS.map((o) => (
+            <button
+              key={o.value}
+              type="button"
+              aria-pressed={theme === o.value}
+              onClick={() => onThemeChange?.(o.value)}
+              className={cls(
+                'min-h-[40px] flex-1 rounded-lg text-[14px] font-bold transition',
+                theme === o.value ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 active:bg-slate-200',
+              )}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {panel === 'sync' && syncProps && <SyncPanel {...syncProps} toast={toast} />}

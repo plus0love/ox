@@ -1,19 +1,87 @@
 @import 'tailwindcss';
 
+/* 다크모드는 <html class="dark"> 로 켠다 (시스템 설정 연동은 lib/theme.js 에서 처리) */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --font-sans:
     -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Pretendard',
     'Noto Sans KR', 'Malgun Gothic', system-ui, sans-serif;
+
+  /* 화면 바탕색 — 라이트에서는 slate-100, 다크에서는 아래에서 덮어쓴다 */
+  --color-page: oklch(96.8% 0.007 247.896);
+
+  /* 테마와 무관하게 항상 흰색/검정 (사진 확대 화면처럼 바탕이 고정된 곳에서만 사용) */
+  --color-pure-white: #fff;
+  --color-pure-black: #000;
+}
+
+/*
+ * 다크모드: 컴포넌트마다 dark: 클래스를 붙이는 대신 색 토큰 자체를 뒤집는다.
+ * Tailwind v4는 bg-slate-100 → var(--color-slate-100) 로 컴파일되므로
+ * 여기서 변수만 바꾸면 모든 화면이 한 번에 따라온다.
+ *
+ *  - white          : 카드 바탕
+ *  - slate-50~300   : 카드 안의 살짝 다른 면 / 보조 버튼 / 구분선 (어두운 쪽)
+ *  - slate-400~500  : 흐린 글씨
+ *  - slate-600~900  : 본문 글씨 (밝은 쪽) · 주요 버튼 바탕
+ *  - 강조색(red/emerald/amber)은 50·100(연한 바탕)은 어둡게, 600~900(글씨)은 밝게
+ */
+.dark {
+  color-scheme: dark;
+
+  --color-page: #0f172a;
+
+  --color-white: #1e293b;
+  --color-slate-50: #263244;
+  --color-slate-100: #334155;
+  --color-slate-200: #475569;
+  --color-slate-300: #64748b;
+  --color-slate-400: #94a3b8;
+  --color-slate-500: #a3aec2;
+  --color-slate-600: #cbd5e1;
+  --color-slate-700: #e2e8f0;
+  --color-slate-800: #f1f5f9;
+  --color-slate-900: #f8fafc;
+
+  --color-red-50: #3b1414;
+  --color-red-100: #4c1d1d;
+  --color-red-300: #7f1d1d;
+  --color-red-500: #ef4444;
+  --color-red-600: #f05252;
+  --color-red-700: #f87171;
+  --color-red-900: #fecaca;
+
+  --color-emerald-50: #0b3b2e;
+  --color-emerald-100: #064e3b;
+  --color-emerald-400: #34d399;
+  --color-emerald-500: #10b981;
+  --color-emerald-600: #34d399;
+  --color-emerald-700: #6ee7b7;
+  --color-emerald-900: #a7f3d0;
+
+  --color-amber-50: #3b2a08;
+  --color-amber-100: #4d3608;
+  --color-amber-300: #92400e;
+  --color-amber-400: #f59e0b;
+  --color-amber-600: #fbbf24;
+  --color-amber-700: #fcd34d;
+}
+
+/* 흰 종이를 찍은 문제 사진은 다크모드에서 눈이 부시므로 살짝 어둡게 */
+.dark img {
+  filter: brightness(0.88);
 }
 
 html {
   -webkit-text-size-adjust: 100%;
+  background: var(--color-page);
 }
 
 body {
   margin: 0;
-  background: #f1f5f9;
-  color: #0f172a;
+  background: var(--color-page);
+  color: var(--color-slate-900);
   font-family: var(--font-sans);
   font-size: 17px;
   line-height: 1.6;
@@ -38,6 +106,12 @@ textarea,
 select {
   font-size: 17px;
   font-family: inherit;
+  color: inherit;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--color-slate-400);
 }
 
 textarea {
@@ -50,6 +124,6 @@ textarea {
   height: 8px;
 }
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: var(--color-slate-300);
   border-radius: 4px;
 }

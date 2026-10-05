@@ -52,7 +52,7 @@ export default function ProblemImage({ imageId, className = '' }) {
           onClick={() => setZoom(false)}
         >
           <img src={src} alt="문제 첨부 이미지 확대" className="max-h-full max-w-full object-contain" />
-          <span className="absolute top-[max(1rem,env(safe-area-inset-top))] right-4 rounded-full bg-white/20 px-4 py-2 text-sm text-white">
+          <span className="absolute top-[max(1rem,env(safe-area-inset-top))] right-4 rounded-full bg-pure-white/20 px-4 py-2 text-sm text-pure-white">
             닫기 ✕
           </span>
         </div>

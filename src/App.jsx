@@ -26,6 +26,7 @@ import {
 } from './lib/store'
 import { syncOnce } from './lib/sync'
 import { clearImages, deleteImage, getAllImages, putImage, putImages } from './lib/imagedb'
+import { useTheme } from './lib/theme'
 
 const TABS = [
   { key: 'home', label: '홈', icon: '📊' },
@@ -37,6 +38,7 @@ const TABS = [
 export default function App() {
   const [state, setState] = useState(loadState)
   const [tab, setTab] = useState('home')
+  const [theme, setTheme] = useTheme()
   const [focusMode, setFocusMode] = useState(false)
   const [quizRequest, setQuizRequest] = useState(null)
   const [managePanel, setManagePanel] = useState(null)
@@ -570,7 +572,7 @@ export default function App() {
   /* ---------- 렌더 ---------- */
 
   return (
-    <div className="mx-auto min-h-screen max-w-2xl bg-slate-100">
+    <div className="mx-auto min-h-screen max-w-2xl bg-page">
       {!focusMode && (
         <ExamBar
           exams={state.exams}
@@ -618,6 +620,8 @@ export default function App() {
             onImport={importData}
             onResetStats={resetStats}
             toast={toast}
+            theme={theme}
+            onThemeChange={setTheme}
             examProps={{
               exams: state.exams,
               activeExamId: state.activeExamId,

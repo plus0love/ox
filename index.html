@@ -12,6 +12,16 @@
     <meta name="apple-mobile-web-app-title" content="오답노트" />
     <link rel="manifest" href="./manifest.webmanifest" />
     <title>오답노트</title>
+    <!-- 첫 화면이 흰색으로 번쩍이지 않도록 React보다 먼저 테마 클래스를 붙인다 (키는 src/lib/theme.js 와 동일) -->
+    <script>
+      ;(function () {
+        try {
+          var t = localStorage.getItem('ox-wrongnote-theme-v1')
+          var dark = t === 'dark' || (t !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches)
+          if (dark) document.documentElement.classList.add('dark')
+        } catch (e) {}
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>
