@@ -14,7 +14,7 @@ export default function ExamBar({ exams, activeExamId, onSelect, onAdd }) {
   }, [activeExamId])
 
   return (
-    <div className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 pt-[env(safe-area-inset-top)] backdrop-blur">
+    <div className="sticky top-0 z-20 border-b border-slate-200 bg-surface/95 pt-[env(safe-area-inset-top)] backdrop-blur">
       <div className="flex items-center gap-2 overflow-x-auto px-3 py-2">
         {exams.map((e) => {
           const active = e.id === activeExamId
@@ -28,7 +28,7 @@ export default function ExamBar({ exams, activeExamId, onSelect, onAdd }) {
               className={cls(
                 'flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-full px-3.5 text-[15px] font-bold whitespace-nowrap transition',
                 active
-                  ? 'bg-slate-800 text-white'
+                  ? 'bg-primary text-white'
                   : 'bg-slate-100 text-slate-500 active:bg-slate-200',
               )}
             >
@@ -37,7 +37,7 @@ export default function ExamBar({ exams, activeExamId, onSelect, onAdd }) {
                 <span
                   className={cls(
                     'rounded-full px-1.5 py-0.5 text-[11.5px] font-bold',
-                    active ? 'bg-white/20 text-white' : 'bg-white text-slate-400',
+                    active ? 'bg-white/20 text-white' : 'bg-surface text-slate-400',
                   )}
                 >
                   {ddayLabel(dday)}
@@ -103,7 +103,7 @@ export function ExamFormDialog({ open, initial, onSubmit, onCancel }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center">
-      <div className="w-full max-w-sm space-y-3.5 rounded-2xl bg-white p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-xl sm:pb-5">
+      <div className="w-full max-w-sm space-y-3.5 rounded-2xl bg-surface p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-xl sm:pb-5">
         <h3 className="text-lg font-bold">{editing ? '시험 정보 수정' : '새 시험 추가'}</h3>
 
         <Field label="시험 이름" required>

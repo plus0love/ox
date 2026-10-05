@@ -117,7 +117,7 @@ export default function ManageTab({
               onClick={() => onThemeChange?.(o.value)}
               className={cls(
                 'min-h-[40px] flex-1 rounded-lg text-[14px] font-bold transition',
-                theme === o.value ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 active:bg-slate-200',
+                theme === o.value ? 'bg-surface text-slate-800 shadow-sm' : 'text-slate-500 active:bg-slate-200',
               )}
             >
               {o.label}
@@ -230,7 +230,7 @@ function ProblemRow({ problem, onEdit, onDelete }) {
             )}
           </ol>
           {problem.explanation && (
-            <p className="rounded-xl bg-white p-3 text-[15px] leading-relaxed whitespace-pre-line text-slate-600">
+            <p className="rounded-xl bg-surface p-3 text-[15px] leading-relaxed whitespace-pre-line text-slate-600">
               {problem.explanation}
             </p>
           )}
@@ -322,7 +322,7 @@ function BackupPanel({ state, onExport, onImport, onResetStats, toast }) {
             type="checkbox"
             checked={withImages}
             onChange={(e) => setWithImages(e.target.checked)}
-            className="h-5 w-5 accent-slate-800"
+            className="h-5 w-5 accent-primary"
           />
           첨부 이미지도 함께 내보내기 (파일 커짐)
         </label>
@@ -359,7 +359,7 @@ function BackupPanel({ state, onExport, onImport, onResetStats, toast }) {
                 mode === m.v
                   ? m.v === 'replace'
                     ? 'bg-red-600 text-white'
-                    : 'bg-slate-800 text-white'
+                    : 'bg-primary text-white'
                   : 'bg-slate-100 text-slate-600 active:bg-slate-200',
               )}
             >
@@ -554,7 +554,7 @@ function ExamPanel({ exams, activeExamId, onSelect, onAdd, onEdit, onDelete }) {
               key={e.id}
               className={cls(
                 'rounded-xl px-3.5 py-3 ring-1',
-                active ? 'bg-slate-50 ring-slate-800' : 'bg-white ring-slate-200',
+                active ? 'bg-slate-50 ring-primary' : 'bg-surface ring-slate-200',
               )}
             >
               <div className="flex items-center gap-2">

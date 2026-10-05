@@ -8,69 +8,72 @@
     -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Pretendard',
     'Noto Sans KR', 'Malgun Gothic', system-ui, sans-serif;
 
-  /* 화면 바탕색 — 라이트에서는 slate-100, 다크에서는 아래에서 덮어쓴다 */
-  --color-page: oklch(96.8% 0.007 247.896);
-
-  /* 테마와 무관하게 항상 흰색/검정 (사진 확대 화면처럼 바탕이 고정된 곳에서만 사용) */
-  --color-pure-white: #fff;
-  --color-pure-black: #000;
+  /* 의미 토큰 — 라이트 값. 다크는 아래 .dark 에서 덮어쓴다 */
+  --color-page: oklch(96.8% 0.007 247.896); /* 화면 바탕 (= slate-100) */
+  --color-surface: #fff; /* 카드·입력창·상단바 바탕 */
+  --color-primary: oklch(27.9% 0.041 260.031); /* 주요 버튼·선택된 칩·D-day 카드 (= slate-800) */
+  --color-primary-active: oklch(20.8% 0.042 265.755); /* 누르는 동안 (= slate-900) */
 }
 
 /*
- * 다크모드: 컴포넌트마다 dark: 클래스를 붙이는 대신 색 토큰 자체를 뒤집는다.
- * Tailwind v4는 bg-slate-100 → var(--color-slate-100) 로 컴파일되므로
- * 여기서 변수만 바꾸면 모든 화면이 한 번에 따라온다.
+ * 다크모드 — 회사에서 몰래 켜도 되는 수준으로 차분하게.
+ * 밝은 면(흰 버튼 등)을 만들지 않고, 글씨도 순백이 아니라 한 톤 눌린 회백색을 쓴다.
  *
- *  - white          : 카드 바탕
- *  - slate-50~300   : 카드 안의 살짝 다른 면 / 보조 버튼 / 구분선 (어두운 쪽)
- *  - slate-400~500  : 흐린 글씨
- *  - slate-600~900  : 본문 글씨 (밝은 쪽) · 주요 버튼 바탕
- *  - 강조색(red/emerald/amber)은 50·100(연한 바탕)은 어둡게, 600~900(글씨)은 밝게
+ * Tailwind v4는 text-slate-800 → var(--color-slate-800) 로 컴파일되므로
+ * 컴포넌트에 dark: 클래스를 붙이지 않고 여기서 변수만 바꾼다.
+ *  - slate-50~300  : 카드 안의 살짝 다른 면 / 보조 버튼 / 구분선 (어두운 쪽)
+ *  - slate-400~500 : 흐린 글씨
+ *  - slate-600~900 : 본문 글씨 (밝은 쪽)
+ *  - white         : 주요 버튼 위 글씨 등 (순백 대신 회백)
+ *  - red/emerald/amber : 채도를 낮춘 값. 50·100(연한 바탕)은 어둡게, 600~900(글씨)은 밝게
  */
 .dark {
   color-scheme: dark;
 
-  --color-page: #0f172a;
+  --color-page: #131a26;
+  --color-surface: #1b2330;
+  --color-primary: #3e4b63;
+  --color-primary-active: #4a5872;
 
-  --color-white: #1e293b;
-  --color-slate-50: #263244;
-  --color-slate-100: #334155;
-  --color-slate-200: #475569;
-  --color-slate-300: #64748b;
-  --color-slate-400: #94a3b8;
-  --color-slate-500: #a3aec2;
-  --color-slate-600: #cbd5e1;
-  --color-slate-700: #e2e8f0;
-  --color-slate-800: #f1f5f9;
-  --color-slate-900: #f8fafc;
+  --color-white: #e3e8ef;
+  --color-slate-50: #222b39;
+  --color-slate-100: #2a3446;
+  --color-slate-200: #3a465a;
+  --color-slate-300: #536176;
+  --color-slate-400: #74839b;
+  --color-slate-500: #8c9aae;
+  --color-slate-600: #a8b3c3;
+  --color-slate-700: #c2cbd8;
+  --color-slate-800: #d6dde7;
+  --color-slate-900: #e3e8ef;
 
-  --color-red-50: #3b1414;
-  --color-red-100: #4c1d1d;
-  --color-red-300: #7f1d1d;
-  --color-red-500: #ef4444;
-  --color-red-600: #f05252;
-  --color-red-700: #f87171;
-  --color-red-900: #fecaca;
+  --color-red-50: #3a2426;
+  --color-red-100: #46292b;
+  --color-red-300: #6b3a3d;
+  --color-red-500: #c95c5c;
+  --color-red-600: #d47070;
+  --color-red-700: #e08c8c;
+  --color-red-900: #f0c6c6;
 
-  --color-emerald-50: #0b3b2e;
-  --color-emerald-100: #064e3b;
-  --color-emerald-400: #34d399;
-  --color-emerald-500: #10b981;
-  --color-emerald-600: #34d399;
-  --color-emerald-700: #6ee7b7;
-  --color-emerald-900: #a7f3d0;
+  --color-emerald-50: #1d3730;
+  --color-emerald-100: #224237;
+  --color-emerald-400: #5dbb97;
+  --color-emerald-500: #35997a;
+  --color-emerald-600: #5dbb97;
+  --color-emerald-700: #82cdb0;
+  --color-emerald-900: #c2e7d8;
 
-  --color-amber-50: #3b2a08;
-  --color-amber-100: #4d3608;
-  --color-amber-300: #92400e;
-  --color-amber-400: #f59e0b;
-  --color-amber-600: #fbbf24;
-  --color-amber-700: #fcd34d;
+  --color-amber-50: #392f1f;
+  --color-amber-100: #44381f;
+  --color-amber-300: #6b5524;
+  --color-amber-400: #c0912f;
+  --color-amber-600: #d3a64a;
+  --color-amber-700: #ddb86a;
 }
 
-/* 흰 종이를 찍은 문제 사진은 다크모드에서 눈이 부시므로 살짝 어둡게 */
+/* 흰 종이를 찍은 문제 사진은 다크모드에서 눈이 부시므로 어둡게 */
 .dark img {
-  filter: brightness(0.88);
+  filter: brightness(0.8);
 }
 
 html {

@@ -170,12 +170,12 @@ export default function QuizTab({ examId, state, onAnswer, onFocusMode, onGoTab,
               className={cls(
                 'min-h-[64px] rounded-xl px-3 py-2 text-left transition',
                 scope === s.key
-                  ? 'bg-slate-800 text-white'
+                  ? 'bg-primary text-white'
                   : 'bg-slate-50 text-slate-700 ring-1 ring-slate-200 active:bg-slate-100',
               )}
             >
               <span className="block text-[16px] font-bold">{s.label}</span>
-              <span className={cls('block text-[12.5px]', scope === s.key ? 'text-slate-300' : 'text-slate-500')}>
+              <span className={cls('block text-[12.5px]', scope === s.key ? 'text-white/60' : 'text-slate-500')}>
                 {s.desc}
               </span>
             </button>
@@ -200,7 +200,7 @@ export default function QuizTab({ examId, state, onAnswer, onFocusMode, onGoTab,
               className={cls(
                 'min-h-[52px] rounded-xl text-[16px] font-bold transition',
                 count === c.value
-                  ? 'bg-slate-800 text-white'
+                  ? 'bg-primary text-white'
                   : 'bg-slate-50 text-slate-700 ring-1 ring-slate-200 active:bg-slate-100',
               )}
             >
@@ -256,7 +256,7 @@ function QuestionView({ session, byId, onPick, onNext, onExit, onFinishNow }) {
   return (
     <div className="pb-[calc(96px+env(safe-area-inset-bottom))]">
       {/* 진행 헤더 */}
-      <div className="sticky top-0 z-10 border-b border-slate-200 bg-white/95 backdrop-blur">
+      <div className="sticky top-0 z-10 border-b border-slate-200 bg-surface/95 backdrop-blur">
         <div className="flex items-center gap-3 px-4 py-2.5">
           <button
             type="button"
@@ -273,7 +273,7 @@ function QuestionView({ session, byId, onPick, onNext, onExit, onFinishNow }) {
           </span>
         </div>
         <div className="h-1 bg-slate-100">
-          <div className="h-full bg-slate-800 transition-all" style={{ width: `${progress}%` }} />
+          <div className="h-full bg-primary transition-all" style={{ width: `${progress}%` }} />
         </div>
       </div>
 
@@ -297,11 +297,11 @@ function QuestionView({ session, byId, onPick, onNext, onExit, onFinishNow }) {
             const isAnswer = i === problem.answer
             const isPicked = result?.picked === i
 
-            let style = 'bg-white ring-1 ring-slate-300 text-slate-800 active:bg-slate-100'
+            let style = 'bg-surface ring-1 ring-slate-300 text-slate-800 active:bg-slate-100'
             if (answered) {
               if (isAnswer) style = 'bg-emerald-50 ring-2 ring-emerald-500 text-emerald-900'
               else if (isPicked) style = 'bg-red-50 ring-2 ring-red-500 text-red-900'
-              else style = 'bg-white ring-1 ring-slate-200 text-slate-400'
+              else style = 'bg-surface ring-1 ring-slate-200 text-slate-400'
             }
 
             return (
@@ -353,7 +353,7 @@ function QuestionView({ session, byId, onPick, onNext, onExit, onFinishNow }) {
 
       {/* 하단 고정 액션 */}
       {answered && (
-        <div className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white/95 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur">
+        <div className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-surface/95 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur">
           <Button className="w-full" onClick={isLast ? onFinishNow : onNext}>
             {isLast ? '결과 보기' : '다음 문제 →'}
           </Button>

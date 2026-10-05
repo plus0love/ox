@@ -656,7 +656,7 @@ export default function App() {
       />
 
       {!focusMode && (
-        <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur">
+        <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur">
           <div className="mx-auto flex max-w-2xl">
             {TABS.map((t) => (
               <button
@@ -681,7 +681,7 @@ export default function App() {
           <div
             className={cls(
               'max-w-md rounded-xl px-4 py-3 text-[15px] font-semibold text-white shadow-lg',
-              toastMsg.kind === 'error' ? 'bg-red-600' : 'bg-slate-800',
+              toastMsg.kind === 'error' ? 'bg-red-600' : 'bg-primary',
             )}
           >
             {toastMsg.text}

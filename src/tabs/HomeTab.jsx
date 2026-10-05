@@ -69,18 +69,18 @@ export default function HomeTab({ state, onGoTab, onStartWeakQuiz, onGoBackup, o
       <button
         type="button"
         onClick={onEditExam}
-        className="w-full rounded-2xl bg-slate-800 p-5 text-left text-white shadow-sm active:bg-slate-900"
+        className="w-full rounded-2xl bg-primary p-5 text-left text-white shadow-sm active:bg-primary-active"
       >
         <div className="flex items-end justify-between gap-3">
           <div className="min-w-0">
-            <p className="truncate text-[15px] font-bold tracking-wide text-slate-100">{state.name}</p>
-            <p className="text-sm text-slate-400">
+            <p className="truncate text-[15px] font-bold tracking-wide text-white/90">{state.name}</p>
+            <p className="text-sm text-white/60">
               {state.examDate ? formatExamDate(state.examDate) : '시험일 미설정 · 눌러서 설정하기'}
             </p>
           </div>
           <div className="shrink-0 text-right">
             {dday === null ? (
-              <p className="text-2xl leading-none font-black text-slate-500">D-?</p>
+              <p className="text-2xl leading-none font-black text-white/50">D-?</p>
             ) : (
               <p className="text-4xl leading-none font-black">
                 {dday > 0 ? `D-${dday}` : dday === 0 ? 'D-DAY' : `D+${-dday}`}
@@ -96,7 +96,7 @@ export default function HomeTab({ state, onGoTab, onStartWeakQuiz, onGoBackup, o
           onClick={onGoBackup}
           className={cls(
             'flex w-full items-center gap-3 rounded-2xl px-4 py-3.5 text-left ring-1',
-            backupWarn.urgent ? 'bg-amber-50 ring-amber-300' : 'bg-white ring-slate-200',
+            backupWarn.urgent ? 'bg-amber-50 ring-amber-300' : 'bg-surface ring-slate-200',
           )}
         >
           <span className="text-xl">💾</span>
@@ -229,7 +229,7 @@ export default function HomeTab({ state, onGoTab, onStartWeakQuiz, onGoBackup, o
 
 function StatTile({ label, value, unit }) {
   return (
-    <div className="rounded-2xl bg-white p-3 text-center shadow-sm ring-1 ring-slate-200/70">
+    <div className="rounded-2xl bg-surface p-3 text-center shadow-sm ring-1 ring-slate-200/70">
       <p className="text-[13px] text-slate-500">{label}</p>
       <p className="mt-0.5 text-2xl font-black text-slate-800">
         {value}
@@ -275,7 +275,7 @@ function NeverCorrectRow({ problem }) {
             )}
           </ol>
           {problem.explanation && (
-            <p className="rounded-lg bg-white p-3 whitespace-pre-line text-slate-600">{problem.explanation}</p>
+            <p className="rounded-lg bg-surface p-3 whitespace-pre-line text-slate-600">{problem.explanation}</p>
           )}
           <p className="text-[13px] text-slate-400">
             {problem.subject}
@@ -300,7 +300,7 @@ function WeekChart({ days }) {
             <div
               className={cls(
                 'w-full rounded-t-md transition-all',
-                d.total ? (d.isToday ? 'bg-slate-800' : 'bg-slate-400') : 'bg-slate-100',
+                d.total ? (d.isToday ? 'bg-primary' : 'bg-slate-400') : 'bg-slate-100',
               )}
               style={{ height: `${Math.max(4, (d.total / max) * 100)}%` }}
             />
